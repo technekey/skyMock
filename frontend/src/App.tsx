@@ -126,14 +126,26 @@ const HelpSection = ({ token, authEnabled }: { token: string; authEnabled: boole
   const authHeader = authEnabled ? ` -H "Authorization: Bearer ${token}"` : "";
   const pythonHeaders = authEnabled ? `headers = {"Authorization": "Bearer ${token}"}\n` : `headers = {}\n`;
   
-  const curlExample = `curl -X GET "${API_BASE}/bookings?travel_date=${new Date().toISOString().split('T')[0]}"${authHeader}`;
-  const pythonExample = `import requests
+  // Historical Fetch Examples
+  const curlFetch = `curl -X GET "${API_BASE}/bookings?travel_date=${new Date().toISOString().split('T')[0]}"${authHeader}`;
+  const pythonFetch = `import requests
 
 url = "${API_BASE}/bookings"
 ${pythonHeaders}params = {"travel_date": "${new Date().toISOString().split('T')[0]}"}
 
 response = requests.get(url, headers=headers, params=params)
 print(response.json())`;
+
+  // Real-time Stream Examples
+  const streamUrl = `${API_BASE}/admin/bookings-stream${authEnabled ? `?token=${token}` : ""}`;
+  const curlStream = `curl -N "${streamUrl}"`;
+  const pythonStream = `import httpx
+
+# Listening to the SSE stream indefinitely
+with httpx.stream("GET", "${streamUrl}", timeout=None) as response:
+    for line in response.iter_lines():
+        if line.startswith("data: "):
+            print(f"New Booking: {line[6:]}")`;
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea"); textArea.value = text;
@@ -145,18 +157,39 @@ print(response.json())`;
   return (
     <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '2rem', maxWidth: '100%' }}>
       <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><HelpCircle size={18} /> API Documentation</h3>
-      <div style={{ marginBottom: '1rem' }}>
+      
+      <div style={{ marginBottom: '1rem', padding: '10px', background: '#f1f5f9', borderRadius: '6px' }}>
         <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: authEnabled ? '#10b981' : '#ef4444' }}>
           AUTH STATUS: {authEnabled ? 'ENABLED (TOKEN REQUIRED)' : 'DISABLED (PUBLIC)'}
         </span>
       </div>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>CURL</span><button onClick={() => copyToClipboard(curlExample)} style={{ cursor: 'pointer' }}>Copy</button></div>
-        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{curlExample}</pre>
-      </div>
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>PYTHON</span><button onClick={() => copyToClipboard(pythonExample)} style={{ cursor: 'pointer' }}>Copy</button></div>
-        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{pythonExample}</pre>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        {/* Section 1: Historical Data */}
+        <div>
+          <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', color: '#1e3a8a' }}>1. Fetch Historical Data</h4>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>CURL</span><button onClick={() => copyToClipboard(curlFetch)} style={{ fontSize: '0.6rem', cursor: 'pointer' }}>Copy</button></div>
+            <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.7rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{curlFetch}</pre>
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>PYTHON (Requests)</span><button onClick={() => copyToClipboard(pythonFetch)} style={{ fontSize: '0.6rem', cursor: 'pointer' }}>Copy</button></div>
+            <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.7rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{pythonFetch}</pre>
+          </div>
+        </div>
+
+        {/* Section 2: Real-time Stream */}
+        <div>
+          <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', color: '#1e3a8a' }}>2. Real-time JSON Stream</h4>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>CURL (Listen Indefinitely)</span><button onClick={() => copyToClipboard(curlStream)} style={{ fontSize: '0.6rem', cursor: 'pointer' }}>Copy</button></div>
+            <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.7rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{curlStream}</pre>
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>PYTHON (Httpx Stream)</span><button onClick={() => copyToClipboard(pythonStream)} style={{ fontSize: '0.6rem', cursor: 'pointer' }}>Copy</button></div>
+            <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.7rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{pythonStream}</pre>
+          </div>
+        </div>
       </div>
     </div>
   );
