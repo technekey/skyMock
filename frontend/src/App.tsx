@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plane, Activity, Lock, LogOut, Calendar, Database, ShieldCheck, HelpCircle, Copy, Terminal } from 'lucide-react';
+import { Plane, Activity, Lock, LogOut, Calendar, Database, ShieldCheck, HelpCircle, Copy, Terminal, RefreshCcw } from 'lucide-react';
 
 const API_PORT = 8000;
 const API_BASE = `http://${window.location.hostname}:${API_PORT}`;
@@ -162,9 +162,8 @@ print(response.json())`;
   );
 };
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ updateToken }: { updateToken: (t: string) => void }) => {
   const [liveBookings, setLiveBookings] = useState<any[]>([]);
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [genConfig, setGenConfig] = useState({ count: 10, target: new Date().toISOString().split('T')[0], mode: 'day' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [authEnabled, setAuthEnabled] = useState(true);
@@ -187,6 +186,15 @@ const AdminDashboard = () => {
     const newVal = !authEnabled;
     await axios.post(`${API_BASE}/admin/toggle-auth`, { enabled: newVal }, { headers: getAuthHeaders() });
     setAuthEnabled(newVal);
+  };
+
+  const regenerateToken = async () => {
+    if (!window.confirm("This will invalidate ALL existing tokens. Continue?")) return;
+    try {
+      const res = await axios.post(`${API_BASE}/admin/rotate-token`, {}, { headers: getAuthHeaders() });
+      updateToken(res.data.access_token);
+      alert("New token generated. Old tokens revoked.");
+    } catch (e) { alert("Revocation failed"); }
   };
 
   const generateMock = async () => {
@@ -240,7 +248,10 @@ const AdminDashboard = () => {
             <div style={{ padding: '1rem', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', wordBreak: 'break-all' }}>
               <p style={{ fontWeight: 'bold', fontSize: '0.75rem', margin: '0 0 10px 0', color: '#64748b' }}>ACCESS TOKEN</p>
               <code style={{ fontSize: '0.7rem' }}>{token}</code>
-              <button onClick={copyToken} style={{ display: 'block', width: '100%', marginTop: '10px', padding: '5px', fontSize: '0.7rem' }}>Copy Token</button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <button onClick={copyToken} style={{ flex: 1, padding: '8px', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}><Copy size={12}/> Copy</button>
+                <button onClick={regenerateToken} style={{ flex: 1, padding: '8px', fontSize: '0.7rem', cursor: 'pointer', background: '#1e293b', color: 'white', border: 'none', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}><RefreshCcw size={12}/> Revoke & New</button>
+              </div>
             </div>
           </div>
         </div>
@@ -251,14 +262,15 @@ const AdminDashboard = () => {
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
+  const updateToken = (t: string) => { localStorage.setItem('token', t); setIsLoggedIn(true); };
   return (
     <Router>
       <div style={{ fontFamily: '"Inter", sans-serif' }}>
         <Navbar isLoggedIn={isLoggedIn} onLogout={() => { localStorage.removeItem('token'); setIsLoggedIn(false); }} />
         <Routes>
           <Route path="/" element={<PublicBooking />} />
-          <Route path="/login" element={<Login onLogin={(t) => { localStorage.setItem('token', t); setIsLoggedIn(true); }} />} />
-          <Route path="/admin" element={isLoggedIn ? <AdminDashboard /> : <Navigate to="/login" />} />
+          <Route path="/login" element={<Login onLogin={updateToken} />} />
+          <Route path="/admin" element={isLoggedIn ? <AdminDashboard updateToken={updateToken} /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </Router>

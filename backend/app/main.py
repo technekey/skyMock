@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import uuid
 from datetime import datetime, date, timedelta
 from typing import List, Optional, AsyncGenerator
 
@@ -32,41 +33,31 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
     hashed_password: str
+    token_version: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 class Booking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    # Passenger Info
     passenger_name: str
     passenger_email: str = Field(default="mock@example.com")
     passenger_phone: str = Field(default="+1-555-0199")
     loyalty_id: Optional[str] = None
-    
-    # Flight Info
     pnr: str
     flight_number: str = Field(default="SK101")
     source: str
     destination: str
     travel_date: date
-    cabin_class: str = Field(default="Economy") # Economy, Business, First
+    cabin_class: str = Field(default="Economy")
     seat_number: str = Field(default="12A")
-    
-    # Financials
     ticket_price: float = Field(default=299.99)
     currency: str = Field(default="USD")
-    
-    # Logistics
     terminal: str = Field(default="T1")
     gate: str = Field(default="G12")
     meal_preference: str
     luggage_kg: int
     services: str
-    
-    # Status
     is_cancellable: bool = Field(default=True)
     cancellation_window_hours: int = Field(default=24)
     check_in_status: bool = Field(default=False)
-    
-    # Timestamps
     booking_time: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -129,9 +120,16 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return username
+        version: str = payload.get("v")
+        if username is None or version is None:
+            raise HTTPException(status_code=401, detail="Invalid token structure")
+        
+        with Session(engine) as session:
+            statement = select(User).where(User.username == username)
+            user = session.exec(statement).first()
+            if not user or user.token_version != version:
+                raise HTTPException(status_code=401, detail="Token has been revoked or is invalid")
+            return username
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -158,7 +156,21 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         user = session.exec(statement).first()
         if not user or not pwd_context.verify(form_data.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Incorrect username or password")
-        access_token = create_access_token(data={"sub": user.username})
+        
+        access_token = create_access_token(data={"sub": user.username, "v": user.token_version})
+        return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/admin/rotate-token", response_model=Token)
+async def rotate_token(current_user: str = Depends(get_current_user)):
+    with Session(engine) as session:
+        statement = select(User).where(User.username == "admin")
+        user = session.exec(statement).one()
+        user.token_version = str(uuid.uuid4())
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        
+        access_token = create_access_token(data={"sub": user.username, "v": user.token_version})
         return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/admin/toggle-auth")
@@ -172,8 +184,6 @@ async def get_settings():
 
 @app.post("/admin/change-password")
 async def change_password(data: PasswordChange, current_user: str = Depends(get_current_user)):
-    if current_user == "guest" and settings.auth_enabled:
-         raise HTTPException(status_code=403, detail="Admin access required")
     with Session(engine) as session:
         statement = select(User).where(User.username == "admin")
         user = session.exec(statement).one()
@@ -265,6 +275,10 @@ async def create_booking(booking_data: BookingCreate):
 async def get_bookings(travel_date: date, token: Optional[str] = Depends(oauth2_scheme)):
     if settings.auth_enabled and not token:
         raise HTTPException(status_code=401, detail="Authentication required")
+    # Verify token version even for bookings
+    if settings.auth_enabled:
+        await get_current_user(token)
+        
     with Session(engine) as session:
         statement = select(Booking).where(Booking.travel_date == travel_date)
         return session.exec(statement).all()
@@ -275,8 +289,16 @@ async def stream_bookings(request: Request, token: Optional[str] = Query(None)):
     if settings.auth_enabled:
         if not token:
             raise HTTPException(status_code=401, detail="Token required")
+        # Reuse get_current_user logic to verify version
         try:
-            jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: str = payload.get("sub")
+            version: str = payload.get("v")
+            with Session(engine) as session:
+                statement = select(User).where(User.username == username)
+                user = session.exec(statement).first()
+                if not user or user.token_version != version:
+                    raise HTTPException(status_code=401, detail="Invalid token version")
         except JWTError:
             raise HTTPException(status_code=401, detail="Invalid token")
 
