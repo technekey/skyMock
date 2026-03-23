@@ -143,7 +143,7 @@ print(response.json())`;
   };
 
   return (
-    <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '2rem' }}>
+    <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '2rem', maxWidth: '100%' }}>
       <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><HelpCircle size={18} /> API Documentation</h3>
       <div style={{ marginBottom: '1rem' }}>
         <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: authEnabled ? '#10b981' : '#ef4444' }}>
@@ -152,11 +152,11 @@ print(response.json())`;
       </div>
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>CURL</span><button onClick={() => copyToClipboard(curlExample)} style={{ cursor: 'pointer' }}>Copy</button></div>
-        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto' }}>{curlExample}</pre>
+        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{curlExample}</pre>
       </div>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}><span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>PYTHON</span><button onClick={() => copyToClipboard(pythonExample)} style={{ cursor: 'pointer' }}>Copy</button></div>
-        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto' }}>{pythonExample}</pre>
+        <pre style={{ background: '#1e293b', color: '#cbd5e1', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{pythonExample}</pre>
       </div>
     </div>
   );
@@ -164,7 +164,6 @@ print(response.json())`;
 
 const AdminDashboard = () => {
   const [liveBookings, setLiveBookings] = useState<any[]>([]);
-  const [historicalBookings, setHistoricalBookings] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [genConfig, setGenConfig] = useState({ count: 10, target: new Date().toISOString().split('T')[0], mode: 'day' });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -175,8 +174,11 @@ const AdminDashboard = () => {
     axios.get(`${API_BASE}/admin/settings`).then(res => setAuthEnabled(res.data.auth_enabled));
     const sse = new EventSource(`${API_BASE}/admin/bookings-stream?token=${token}`);
     sse.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      setLiveBookings(prev => [data, ...prev].slice(0, 5));
+      if (e.data === ": keep-alive") return;
+      try {
+        const data = JSON.parse(e.data);
+        setLiveBookings(prev => [data, ...prev].slice(0, 5));
+      } catch (err) { console.error("Error parsing SSE", err); }
     };
     return () => sse.close();
   }, [token]);
@@ -200,19 +202,19 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: 'auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '2rem' }}>
-        <div>
+    <div style={{ padding: '2rem', maxWidth: '100vw', boxSizing: 'border-box' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 350px', gap: '2rem' }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2rem' }}>
             <Activity color="#2563eb" /> <h1 style={{ margin: 0 }}>System Control Tower</h1>
           </div>
-          <div style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #1e293b' }}>
+          <div style={{ background: '#0f172a', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #1e293b', maxWidth: '100%' }}>
             <h3 style={{ color: 'white', marginTop: 0 }}><Terminal size={18} /> Real-time Airline Data Lake Stream (JSON)</h3>
-            <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', height: '350px', overflowY: 'auto' }}>
+            <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', height: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
               {liveBookings.length === 0 && <p style={{ color: '#64748b' }}>Awaiting data stream...</p>}
               {liveBookings.map((b, i) => (
-                <div key={i} style={{ marginBottom: '10px', padding: '10px', background: '#1e293b', borderLeft: '3px solid #10b981' }}>
-                  <pre style={{ margin: 0, color: '#10b981' }}>{JSON.stringify(b, null, 2)}</pre>
+                <div key={i} style={{ marginBottom: '10px', padding: '10px', background: '#1e293b', borderLeft: '3px solid #10b981', maxWidth: '100%', boxSizing: 'border-box' }}>
+                  <pre style={{ margin: 0, color: '#10b981', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxWidth: '100%' }}>{JSON.stringify(b, null, 2)}</pre>
                 </div>
               ))}
             </div>
@@ -229,7 +231,7 @@ const AdminDashboard = () => {
           <HelpSection token={token} authEnabled={authEnabled} />
         </div>
         <div>
-          <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', position: 'sticky', top: '2rem' }}>
             <h4 style={{ marginTop: 0 }}><ShieldCheck size={18} /> API Governance</h4>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '10px', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Auth Tokens</span>
