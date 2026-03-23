@@ -194,7 +194,14 @@ const AdminDashboard = ({ updateToken }: { updateToken: (t: string) => void }) =
       const res = await axios.post(`${API_BASE}/admin/rotate-token`, {}, { headers: getAuthHeaders() });
       updateToken(res.data.access_token);
       alert("New token generated. Old tokens revoked.");
-    } catch (e) { alert("Revocation failed"); }
+    } catch (e: any) { 
+      const msg = e.response?.data?.detail || e.message || "Unknown error";
+      alert(`Revocation failed: ${msg}`);
+      if (e.response?.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+    }
   };
 
   const generateMock = async () => {

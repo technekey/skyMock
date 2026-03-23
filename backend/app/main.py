@@ -164,7 +164,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 async def rotate_token(current_user: str = Depends(get_current_user)):
     with Session(engine) as session:
         statement = select(User).where(User.username == "admin")
-        user = session.exec(statement).one()
+        user = session.exec(statement).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Admin user not found in database")
+        
         user.token_version = str(uuid.uuid4())
         session.add(user)
         session.commit()
